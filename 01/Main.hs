@@ -1,8 +1,12 @@
 module Main where
 
+import Control.Monad (foldM)
 import Data.Char (isDigit)
-import Data.Monoid (Sum(..))
+import Data.Maybe (fromMaybe)
+import Data.Monoid (Sum(..), First(..))
+import Data.Set (Set)
 import Text.ParserCombinators.ReadP as P
+import qualified Data.Set as Set
 
 testCases :: [([String], Int)]
 testCases =
@@ -27,4 +31,20 @@ instance Read Action where
 solution :: [String] -> Int
 solution = getSum . foldMap (runAction . read)
 
-main = mapM_ (print . solution . fst) testCases
+scan :: Monoid m => [m] -> [m]
+scan = scanl mappend mempty
+
+solution' :: [String] -> Maybe Int
+solution' = fmap getSum . findDup . scan . cycle . map (runAction . read)
+
+findDup :: Ord a => [a] -> Maybe a
+findDup = either Just (const Nothing) . foldM k Set.empty
+    where k seen a =
+            if Set.member a seen
+            then Left a
+            else Right (Set.insert a seen)
+
+main = do
+    input <- lines <$> readFile "01/input.txt"
+    print (solution  input)
+    print (solution' input)
