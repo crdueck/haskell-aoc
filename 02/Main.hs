@@ -2,12 +2,13 @@
 
 module Main where
 
+import Data.Bifunctor (second)
 import Control.Monad (zipWithM)
-import Data.List as L (delete, tails, find)
+import Data.List as L (delete, tails)
 import Data.Map (Map)
 import Data.Monoid (Sum(..),First(..))
-import qualified Data.Map as Map
 import qualified Data.Foldable as F
+import qualified Data.Map as Map
 
 testCase :: ([String], Int)
 testCase =
@@ -39,34 +40,36 @@ solution = checksum . foldMap (count . histogram)
             | F.any (==3) m = three
             | otherwise = mempty
 
-findFirstDifference :: Eq a => [a] -> [a] -> Maybe a
-findFirstDifference [] _ = Nothing
-findFirstDifference _ [] = Nothing
-findFirstDifference (x:xs) (y:ys)
-    | x /= y    = Just y
-    | otherwise = findFirstDifference xs ys
-
-hamming :: Eq a => [a] -> [a] -> Int
-hamming xs = getSum . mconcat . zipWith k xs
-    where k a b = if a == b then 0 else 1
-
-type Lens s t a b = forall f. Functor f => (a -> f b) -> s -> f t
-
--- not sure which lens this is, I'm sure it's defined somewhere
-someLens :: Lens a (b, a) a b
-someLens afb a = (\b -> (b, a)) <$> afb a
-
 firstJust :: [Maybe a] -> Maybe a
 firstJust = getFirst . foldMap First
 
 solution' :: [String] -> Maybe String
 solution' xs = uncurry L.delete <$> firstJust ys
     where ys = zipWith k xs (L.tails xs)
-          k a = go
-            where go [] = Nothing
-                  go (x:xs)
-                    | hamming a x == 1 = findFirstDifference a `someLens` x
-                    | otherwise        = go xs
+          k xs = firstJust
+               . map (fmap swap . strength)
+               . tabulate (singleton . diffR xs)
+
+-- right biased difference
+diffR :: Eq a => [a] -> [a] -> [a]
+diffR [] ys = ys
+diffR xs [] = xs
+diffR (x:xs) (y:ys)
+    | x == y    = diffR xs ys
+    | otherwise = y : diffR xs ys
+
+tabulate :: (a -> b) -> [a] -> [(a, b)]
+tabulate f = map (\a -> (a, f a))
+
+swap :: (a, b) -> (b, a)
+swap (x, y) = (y, x)
+
+singleton :: [a] -> Maybe a
+singleton (x:[]) = Just x
+singleton _      = Nothing
+
+strength :: Functor f => (a, f b) -> f (a, b)
+strength (a, fb) = fmap (\b -> (a, b)) fb
 
 main = do
     inputs <- lines <$> readFile "02/input.txt"
